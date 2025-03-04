@@ -1,11 +1,13 @@
 package com.fellow.jwt.config;
 
 import com.fellow.jwt.service.AuthService;
+import com.fellow.jwt.util.JwtAuthenticationFilter;
 import com.fellow.jwt.util.JwtUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.User;
@@ -14,26 +16,28 @@ import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig  {
 
     @Bean
-    protected UserDetailsService uds()  {
+    public UserDetailsService userDetailsService() {
         var uds = new InMemoryUserDetailsManager();
 
-        uds.createUser(User.withUsername("user").password("password").authorities("Read","ROLE_USER").build());
-        var admin = User.withUsername("admin")
+        uds.createUser(User.withUsername("user")
                 .password("password")
-                .authorities("Read", "Write","ROLE_ADMIN")
-                .build();
-        uds.createUser(admin);
+                .authorities("READ", "ROLE_USER")
+                .build());
 
+        uds.createUser(User.withUsername("admin")
+                .password("password")
+                .authorities("READ", "WRITE", "ROLE_ADMIN")
+                .build());
 
         return uds;
-
-
     }
 
     @Bean
@@ -42,17 +46,22 @@ public class SecurityConfig  {
     }
     @Bean
     protected SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.csrf(c->c.disable())
-                .authorizeHttpRequests(a->a.requestMatchers("/authenticate").permitAll());
-        http.authorizeHttpRequests(a->a.anyRequest().authenticated());
+        http.csrf(c -> c.disable())
+                .authorizeHttpRequests(a -> a
+                        .requestMatchers("/authenticate").permitAll()
+                        //  .requestMatchers("/secured").authenticated()
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil(), authService()), UsernamePasswordAuthenticationFilter.class);
         return http.build();
-}
+    }
+
 
     @Bean
     public AuthenticationManager authenticationManager(HttpSecurity httpSecurity) throws Exception {
         AuthenticationManagerBuilder authenticationManagerBuilder = httpSecurity.getSharedObject(AuthenticationManagerBuilder.class);
 
-        authenticationManagerBuilder.userDetailsService(uds()).passwordEncoder(passwordEncoder());
+        authenticationManagerBuilder.userDetailsService(userDetailsService()).passwordEncoder(passwordEncoder());
 
         return authenticationManagerBuilder.build();
     }
@@ -61,10 +70,9 @@ public class SecurityConfig  {
         return new JwtUtil();
     }
 
-    // Provide AuthService as a bean
     @Bean
     public AuthService authService() {
-        return new AuthService(); // Update this based on your AuthService implementation
+        return new AuthService();
     }
 
 }

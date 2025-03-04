@@ -1,6 +1,6 @@
 package com.fellow.jwt.util;
-
 import com.fellow.jwt.service.AuthService;
+import com.fellow.jwt.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -36,12 +37,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // Load the user details using the authService
+
             UserDetails userDetails = authService.loadUserByUsername(username);
 
-            // Validate the token
+
             if (jwtUtil.validateToken(token, userDetails)) {
-                // If the token is valid, set the authentication in the SecurityContext
+
+                List<String> roles = jwtUtil.extractAllClaims(token).get("roles", List.class);
+
+
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -50,4 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         filterChain.doFilter(request, response);
     }
+
+
+
 }
